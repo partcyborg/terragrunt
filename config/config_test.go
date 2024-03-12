@@ -285,9 +285,9 @@ func TestParseIamAssumeRoleSessionName(t *testing.T) {
 
 func TestParseIamWebIdentity(t *testing.T) {
 	t.Parallel()
-	tokenPath := "/tmp/web-identity-token"
+	token := "test-token"
 
-	config := fmt.Sprintf(`iam_web_identity_token = "%s"`, tokenPath)
+	config := fmt.Sprintf(`iam_web_identity_token = "%s"`, token)
 
 	ctx := NewParsingContext(context.Background(), mockOptionsForTest(t))
 	terragruntConfig, err := ParseConfigString(ctx, DefaultTerragruntConfigPath, config, nil)
@@ -299,7 +299,7 @@ func TestParseIamWebIdentity(t *testing.T) {
 	assert.Nil(t, terragruntConfig.Dependencies)
 	assert.Nil(t, terragruntConfig.RetryableErrors)
 	assert.Empty(t, terragruntConfig.IamRole)
-	assert.Equal(t, tokenPath, terragruntConfig.IamWebIdentityToken)
+	assert.Equal(t, token, terragruntConfig.IamWebIdentityToken)
 }
 
 func TestParseTerragruntConfigDependenciesOnePath(t *testing.T) {

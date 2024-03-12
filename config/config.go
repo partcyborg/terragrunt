@@ -126,7 +126,7 @@ func (conf *TerragruntConfig) GetIAMRoleOptions() options.IAMRoleOptions {
 	configIAMRoleOptions := options.IAMRoleOptions{
 		RoleARN:               conf.IamRole,
 		AssumeRoleSessionName: conf.IamAssumeRoleSessionName,
-		WebIdentityTokenPath:  conf.IamWebIdentityToken,
+		WebIdentityToken:      conf.IamWebIdentityToken,
 	}
 	if conf.IamAssumeRoleDuration != nil {
 		configIAMRoleOptions.AssumeRoleDuration = *conf.IamAssumeRoleDuration

@@ -141,9 +141,9 @@ func NewGlobalFlags(opts *options.TerragruntOptions) cli.Flags {
 		},
 		&cli.GenericFlag[string]{
 			Name:        FlagNameTerragruntIAMWebIdentityToken,
-			Destination: &opts.IAMRoleOptions.WebIdentityTokenPath,
+			Destination: &opts.IAMRoleOptions.WebIdentityToken,
 			EnvVar:      "TERRRAGRUNT_IAM_ASSUME_ROLE_WEB_IDENTITY_TOKEN",
-			Usage:       "For AssumeRoleWithWebIdentity, the path to the WebIdentity token on disk. Can also be set via TERRRAGRUNT_IAM_ASSUME_ROLE_WEB_IDENTITY_TOKEN environment variable",
+			Usage:       "For AssumeRoleWithWebIdentity, the WebIdentity token. Can also be set via TERRRAGRUNT_IAM_ASSUME_ROLE_WEB_IDENTITY_TOKEN environment variable",
 		},
 		&cli.BoolFlag{
 			Name:        FlagNameTerragruntIgnoreDependencyErrors,

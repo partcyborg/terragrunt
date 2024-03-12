@@ -132,8 +132,8 @@ func TestParseTerragruntOptionsFromArgs(t *testing.T) {
 		},
 
 		{
-			[]string{doubleDashed(commands.FlagNameTerragruntIAMWebIdentityToken), "/tmp/web-identity-token"},
-			mockOptionsWithIamWebIdentityToken(t, util.JoinPath(workingDir, config.DefaultTerragruntConfigPath), workingDir, []string{}, false, "", false, "/tmp/web-identity-token"),
+			[]string{doubleDashed(commands.FlagNameTerragruntIAMWebIdentityToken), "web-identity-token"},
+			mockOptionsWithIamWebIdentityToken(t, util.JoinPath(workingDir, config.DefaultTerragruntConfigPath), workingDir, []string{}, false, "", false, "web-identity-token"),
 			nil,
 		},
 
@@ -255,8 +255,8 @@ func mockOptionsWithIamAssumeRoleSessionName(t *testing.T, terragruntConfigPath 
 
 func mockOptionsWithIamWebIdentityToken(t *testing.T, terragruntConfigPath string, workingDir string, terraformCliArgs []string, nonInteractive bool, terragruntSource string, ignoreDependencyErrors bool, webIdentityToken string) *options.TerragruntOptions {
 	opts := mockOptions(t, terragruntConfigPath, workingDir, terraformCliArgs, nonInteractive, terragruntSource, ignoreDependencyErrors, false, defaultLogLevel, false)
-	opts.OriginalIAMRoleOptions.WebIdentityTokenPath = webIdentityToken
-	opts.IAMRoleOptions.WebIdentityTokenPath = webIdentityToken
+	opts.OriginalIAMRoleOptions.WebIdentityToken = webIdentityToken
+	opts.IAMRoleOptions.WebIdentityToken = webIdentityToken
 	return opts
 }
 
