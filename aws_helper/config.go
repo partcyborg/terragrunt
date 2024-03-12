@@ -2,6 +2,7 @@ package aws_helper
 
 import (
 	"fmt"
+	"io/ioutil"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -95,6 +96,11 @@ func CreateAwsSessionFromConfig(config *AwsSessionConfig, terragruntOptions *opt
 		)
 	}
 
+	if iamRoleOptions.WebIdentityTokenPath != "" && iamRoleOptions.RoleARN != "" {
+		sess.Config.Credentials = getWebIdentityCredentialsFromIAMRoleOptions(sess, iamRoleOptions)
+		return sess, nil
+	}
+
 	credentialOptFn := func(p *stscreds.AssumeRoleProvider) {
 		if config.ExternalID != "" {
 			p.ExternalID = aws.String(config.ExternalID)
@@ -105,6 +111,22 @@ func CreateAwsSessionFromConfig(config *AwsSessionConfig, terragruntOptions *opt
 		sess.Config.Credentials = getSTSCredentialsFromIAMRoleOptions(sess, iamRoleOptions, credentialOptFn)
 	}
 	return sess, nil
+}
+
+func getWebIdentityCredentialsFromIAMRoleOptions(sess *session.Session, iamRoleOptions options.IAMRoleOptions) *credentials.Credentials {
+	roleSessionName := iamRoleOptions.AssumeRoleSessionName
+	if roleSessionName == "" {
+		// Set a unique session name in the same way it is done in the SDK
+		roleSessionName = fmt.Sprintf("%d", time.Now().UTC().UnixNano())
+	}
+	svc := sts.New(sess)
+	p := stscreds.NewWebIdentityRoleProviderWithOptions(svc, iamRoleOptions.RoleARN, roleSessionName, stscreds.FetchTokenPath(iamRoleOptions.WebIdentityTokenPath))
+	if iamRoleOptions.AssumeRoleDuration > 0 {
+		p.Duration = time.Second * time.Duration(iamRoleOptions.AssumeRoleDuration)
+	} else {
+		p.Duration = time.Second * time.Duration(options.DefaultIAMAssumeRoleDuration)
+	}
+	return credentials.NewCredentials(p)
 }
 
 func getSTSCredentialsFromIAMRoleOptions(sess *session.Session, iamRoleOptions options.IAMRoleOptions, optFns ...func(*stscreds.AssumeRoleProvider)) *credentials.Credentials {
@@ -139,8 +161,13 @@ func CreateAwsSession(config *AwsSessionConfig, terragruntOptions *options.Terra
 		}
 		sess.Handlers.Build.PushFrontNamed(addUserAgent)
 		if terragruntOptions.IAMRoleOptions.RoleARN != "" {
-			terragruntOptions.Logger.Debugf("Assuming role %s", terragruntOptions.IAMRoleOptions.RoleARN)
-			sess.Config.Credentials = getSTSCredentialsFromIAMRoleOptions(sess, terragruntOptions.IAMRoleOptions)
+			if terragruntOptions.IAMRoleOptions.WebIdentityTokenPath != "" {
+				terragruntOptions.Logger.Debugf("Assuming role %s with WebIdentity token %s", terragruntOptions.IAMRoleOptions.RoleARN, terragruntOptions.IAMRoleOptions.WebIdentityTokenPath)
+				sess.Config.Credentials = getWebIdentityCredentialsFromIAMRoleOptions(sess, terragruntOptions.IAMRoleOptions)
+			} else {
+				terragruntOptions.Logger.Debugf("Assuming role %s", terragruntOptions.IAMRoleOptions.RoleARN)
+				sess.Config.Credentials = getSTSCredentialsFromIAMRoleOptions(sess, terragruntOptions.IAMRoleOptions)
+			}
 		}
 	} else {
 		sess, err = CreateAwsSessionFromConfig(config, terragruntOptions)
@@ -188,18 +215,39 @@ func AssumeIamRole(iamRoleOpts options.IAMRoleOptions) (*sts.Credentials, error)
 		sessionDurationSeconds = iamRoleOpts.AssumeRoleDuration
 	}
 
-	input := sts.AssumeRoleInput{
-		RoleArn:         aws.String(iamRoleOpts.RoleARN),
-		RoleSessionName: aws.String(sessionName),
-		DurationSeconds: aws.Int64(sessionDurationSeconds),
-	}
+	if iamRoleOpts.WebIdentityTokenPath != "" {
+		webToken, err := ioutil.ReadFile(iamRoleOpts.WebIdentityTokenPath)
+		if err != nil {
+			return nil, err
+		}
+		input := sts.AssumeRoleWithWebIdentityInput{
+			RoleArn:          aws.String(iamRoleOpts.RoleARN),
+			RoleSessionName:  aws.String(sessionName),
+			WebIdentityToken: aws.String(string(webToken)),
+			DurationSeconds:  aws.Int64(sessionDurationSeconds),
+		}
+		req, resp := stsClient.AssumeRoleWithWebIdentityRequest(&input)
+		// InvalidIdentityToken error is a temporary error that can occur
+		// when assuming an Role with a JWT web identity token.
+		req.RetryErrorCodes = append(req.RetryErrorCodes, sts.ErrCodeInvalidIdentityTokenException)
+		if err := req.Send(); err != nil {
+			return nil, err
+		}
+		return resp.Credentials, nil
+	} else {
+		input := sts.AssumeRoleInput{
+			RoleArn:         aws.String(iamRoleOpts.RoleARN),
+			RoleSessionName: aws.String(sessionName),
+			DurationSeconds: aws.Int64(sessionDurationSeconds),
+		}
 
-	output, err := stsClient.AssumeRole(&input)
-	if err != nil {
-		return nil, errors.WithStackTrace(err)
-	}
+		output, err := stsClient.AssumeRole(&input)
+		if err != nil {
+			return nil, errors.WithStackTrace(err)
+		}
 
-	return output.Credentials, nil
+		return output.Credentials, nil
+	}
 }
 
 // Return the AWS caller identity associated with the current set of credentials

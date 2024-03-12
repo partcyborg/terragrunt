@@ -126,6 +126,16 @@ func TestMergeConfigIntoIncludedConfig(t *testing.T) {
 			&TerragruntConfig{IamRole: "role1"},
 			&TerragruntConfig{IamRole: "role2"},
 		},
+		{
+			&TerragruntConfig{IamWebIdentityToken: "/tmp/token"},
+			&TerragruntConfig{IamWebIdentityToken: "/tmp/token"},
+			&TerragruntConfig{IamWebIdentityToken: "/tmp/token"},
+		},
+		{
+			&TerragruntConfig{},
+			&TerragruntConfig{IamWebIdentityToken: "/tmp/token"},
+			&TerragruntConfig{IamWebIdentityToken: "/tmp/token"},
+		},
 	}
 
 	for _, testCase := range testCases {
