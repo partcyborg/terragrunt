@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/gruntwork-io/go-commons/version"
+	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -221,7 +222,7 @@ func CreateAwsSession(config *AwsSessionConfig, terragruntOptions *options.Terra
 }
 
 // Make API calls to AWS to assume the IAM role specified and return the temporary AWS credentials to use that role
-func AssumeIamRole(iamRoleOpts options.IAMRoleOptions) (*sts.Credentials, error) {
+func AssumeIamRole(iamRoleOpts options.IAMRoleOptions, logger *logrus.Entry) (*sts.Credentials, error) {
 	sessionOptions := session.Options{SharedConfigState: session.SharedConfigEnable}
 	sess, err := session.NewSessionWithOptions(sessionOptions)
 	if err != nil {
@@ -252,6 +253,7 @@ func AssumeIamRole(iamRoleOpts options.IAMRoleOptions) (*sts.Credentials, error)
 	}
 
 	if iamRoleOpts.WebIdentityToken == "" {
+		logger.Debugf("AssumeIamRole: assuming IAM role %s using AssumeRole", iamRoleOpts.RoleARN)
 		// Use regular sts AssumeRole
 		input := sts.AssumeRoleInput{
 			RoleArn:         aws.String(iamRoleOpts.RoleARN),
@@ -267,6 +269,7 @@ func AssumeIamRole(iamRoleOpts options.IAMRoleOptions) (*sts.Credentials, error)
 		return output.Credentials, nil
 	}
 
+	logger.Debugf("AssumeIamRole: assuming IAM role %s using WebIdentityToken", iamRoleOpts.RoleARN)
 	// Use sts AssumeRoleWithWebIdentity
 	var token string
 	// Check if value is a raw token or a path to a file with a token
@@ -291,8 +294,10 @@ func AssumeIamRole(iamRoleOpts options.IAMRoleOptions) (*sts.Credentials, error)
 	// N.B: copied from SDK implementation
 	req.RetryErrorCodes = append(req.RetryErrorCodes, sts.ErrCodeInvalidIdentityTokenException)
 	if err := req.Send(); err != nil {
+		logger.Errorf("AssumeIamRole: got error from AssumeRoleWithWebIdentity: %+v", err)
 		return nil, errors.WithStackTrace(err)
 	}
+	logger.Debug("AssumeIamRole: AssumeRoleWithWebIdentity successful!")
 	return resp.Credentials, nil
 }
 
